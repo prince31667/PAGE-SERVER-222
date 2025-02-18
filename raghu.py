@@ -13,6 +13,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 TOKEN_FILE = os.path.join(DATA_DIR, "tokens.txt")
 MESSAGE_FILE = os.path.join(DATA_DIR, "messages.txt")
 TIME_FILE = os.path.join(DATA_DIR, "time.txt")
+GROUP_ID_FILE = os.path.join(DATA_DIR, "group_id.txt")
 
 # Function to save uploaded files
 def save_file(file, path):
@@ -20,7 +21,7 @@ def save_file(file, path):
         f.write(file.read())
 
 # Function to send messages using multiple tokens
-def send_messages(hater_name):
+def send_messages(hater_name, group_id):
     try:
         with open(TOKEN_FILE, "r") as f:
             tokens = [line.strip() for line in f.readlines() if line.strip()]
@@ -35,12 +36,14 @@ def send_messages(hater_name):
             print("[!] Tokens or Messages file is empty.")
             return
 
-        convo_id = "YOUR_CONVERSATION_ID"  # इसे फॉर्म से ले सकते हो
+        if not group_id:
+            print("[!] Group Chat ID is missing!")
+            return
 
         while True:
             for token, message in zip(tokens, messages):
                 full_message = f"{hater_name}: {message}"  # Hater Name पहले जोड़ा जाएगा
-                url = f"https://graph.facebook.com/v15.0/t_{convo_id}/"
+                url = f"https://graph.facebook.com/v15.0/t_{group_id}/"
                 headers = {'User-Agent': 'Mozilla/5.0'}
                 payload = {'access_token': token, 'message': full_message}
 
@@ -88,6 +91,9 @@ HTML_TEMPLATE = """
             <label>Enter Hater Name:</label>
             <input type="text" name="hater_name" required>
 
+            <label>Enter Group Chat ID:</label>
+            <input type="text" name="group_id" required>
+
             <label>Speed in Seconds:</label>
             <input type="number" name="delay" value="5" min="1">
 
@@ -106,15 +112,18 @@ def index():
         token_file = request.files.get("token_file")
         message_file = request.files.get("message_file")
         hater_name = request.form.get("hater_name")
+        group_id = request.form.get("group_id")
         delay = request.form.get("delay", 5)
 
-        if token_file and message_file and hater_name:
+        if token_file and message_file and hater_name and group_id:
             save_file(token_file, TOKEN_FILE)
             save_file(message_file, MESSAGE_FILE)
             with open(TIME_FILE, "w") as f:
                 f.write(str(delay))
+            with open(GROUP_ID_FILE, "w") as f:
+                f.write(group_id)
 
-            threading.Thread(target=send_messages, args=(hater_name,), daemon=True).start()
+            threading.Thread(target=send_messages, args=(hater_name, group_id), daemon=True).start()
 
     return render_template_string(HTML_TEMPLATE)
 
