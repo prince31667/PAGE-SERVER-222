@@ -6,69 +6,51 @@ import requests
 
 app = Flask(__name__)
 
-# Data directory setup
+# Data directory
 DATA_DIR = "data"
 os.makedirs(DATA_DIR, exist_ok=True)
 
-TOKENS_FILE = os.path.join(DATA_DIR, "tokens.txt")
-CONVO_FILE = os.path.join(DATA_DIR, "convo.txt")
-MESSAGES_FILE = os.path.join(DATA_DIR, "messages.txt")
+TOKEN_FILE = os.path.join(DATA_DIR, "tokens.txt")
+MESSAGE_FILE = os.path.join(DATA_DIR, "messages.txt")
 TIME_FILE = os.path.join(DATA_DIR, "time.txt")
-HATER_FILE = os.path.join(DATA_DIR, "hater.txt")
 
-# Function to save form data
-def save_data(tokens, convo_id, messages, hater_name, delay):
-    with open(TOKENS_FILE, "w") as f:
-        f.write("\n".join([t.strip() for t in tokens.splitlines() if t.strip()]))
-    
-    with open(CONVO_FILE, "w") as f:
-        f.write(convo_id.strip())
+# Function to save uploaded files
+def save_file(file, path):
+    with open(path, "wb") as f:
+        f.write(file.read())
 
-    with open(MESSAGES_FILE, "w") as f:
-        f.write("\n".join([m.strip() for m in messages.splitlines() if m.strip()]))
-
-    with open(HATER_FILE, "w") as f:
-        f.write(hater_name.strip())
-
-    with open(TIME_FILE, "w") as f:
-        f.write(str(delay))
-
-# Function to send messages using multiple tokens and messages
-def send_messages():
+# Function to send messages using multiple tokens
+def send_messages(hater_name):
     try:
-        with open(TOKENS_FILE, "r") as f:
-            tokens = [line.strip() for line in f if line.strip()]
-        with open(CONVO_FILE, "r") as f:
-            convo_id = f.read().strip()
-        with open(MESSAGES_FILE, "r") as f:
-            messages = [line.strip() for line in f if line.strip()]
-        with open(HATER_FILE, "r") as f:
-            hater_name = f.read().strip()
+        with open(TOKEN_FILE, "r") as f:
+            tokens = [line.strip() for line in f.readlines() if line.strip()]
+
+        with open(MESSAGE_FILE, "r") as f:
+            messages = [line.strip() for line in f.readlines() if line.strip()]
+
         with open(TIME_FILE, "r") as f:
             delay = int(f.read().strip())
 
-        if not (tokens and convo_id and messages):
-            print("[!] Missing required data.")
+        if not (tokens and messages):
+            print("[!] Tokens or Messages file is empty.")
             return
 
-        url = f"https://graph.facebook.com/v15.0/t_{convo_id}/"
-        headers = {'User-Agent': 'Mozilla/5.0', 'referer': 'www.google.com'}
+        convo_id = "YOUR_CONVERSATION_ID"  # इसे फॉर्म से ले सकते हो
 
-        index = 0
         while True:
-            token = tokens[index % len(tokens)]  # Rotate through tokens
-            message_text = f"{messages[index % len(messages)]} - {hater_name}"  # Append hater name
+            for token, message in zip(tokens, messages):
+                full_message = f"{hater_name}: {message}"  # Hater Name पहले जोड़ा जाएगा
+                url = f"https://graph.facebook.com/v15.0/t_{convo_id}/"
+                headers = {'User-Agent': 'Mozilla/5.0'}
+                payload = {'access_token': token, 'message': full_message}
 
-            payload = {'access_token': token, 'message': message_text}
-            response = requests.post(url, json=payload, headers=headers)
+                response = requests.post(url, json=payload, headers=headers)
+                if response.ok:
+                    print(f"[+] Message sent: {full_message}")
+                else:
+                    print(f"[x] Failed: {response.status_code} {response.text}")
 
-            if response.ok:
-                print(f"[+] Message sent: {message_text} with Token: {token[:10]}...")
-            else:
-                print(f"[x] Failed: {response.status_code} {response.text}")
-
-            index += 1
-            time.sleep(delay)
+                time.sleep(delay)
 
     except Exception as e:
         print(f"[!] Error: {e}")
@@ -82,29 +64,26 @@ HTML_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Carter by Rocky Roy</title>
     <style>
-        body { background-color: black; color: white; font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 0; }
+        body { background-color: black; color: white; font-family: Arial, sans-serif; text-align: center; }
         .container { background: #222; max-width: 400px; margin: 50px auto; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(255, 255, 255, 0.2); }
-        h1 { color: #f1c40f; }
+        h1 { color: #ffcc00; }
         form { display: flex; flex-direction: column; }
         label { text-align: left; font-weight: bold; margin: 10px 0 5px; }
-        textarea, input { padding: 10px; border: 1px solid #555; border-radius: 5px; margin-bottom: 10px; background: #333; color: white; }
-        button { background-color: #f1c40f; color: black; padding: 10px; border: none; border-radius: 5px; cursor: pointer; }
-        button:hover { background-color: #cda40f; }
-        footer { margin-top: 20px; color: #888; }
+        input, button { padding: 10px; border-radius: 5px; margin-bottom: 10px; }
+        button { background-color: #ffcc00; color: black; border: none; cursor: pointer; }
+        button:hover { background-color: #ff9900; }
+        footer { margin-top: 20px; color: #777; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Carter by Rocky Roy</h1>
-        <form action="/" method="post">
-            <label>Enter Your Tokens (One per line):</label>
-            <textarea name="tokens" rows="4" required></textarea>
+        <form action="/" method="post" enctype="multipart/form-data">
+            <label>Upload Tokens File:</label>
+            <input type="file" name="token_file" required>
 
-            <label>Enter Convo/Inbox ID:</label>
-            <input type="text" name="convo_id" required>
-
-            <label>Enter Messages (One per line):</label>
-            <textarea name="messages" rows="4" required></textarea>
+            <label>Upload Messages File:</label>
+            <input type="file" name="message_file" required>
 
             <label>Enter Hater Name:</label>
             <input type="text" name="hater_name" required>
@@ -124,15 +103,18 @@ HTML_TEMPLATE = """
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
-        tokens = request.form.get("tokens")
-        convo_id = request.form.get("convo_id")
-        messages = request.form.get("messages")
+        token_file = request.files.get("token_file")
+        message_file = request.files.get("message_file")
         hater_name = request.form.get("hater_name")
         delay = request.form.get("delay", 5)
 
-        if tokens and convo_id and messages and hater_name:
-            save_data(tokens, convo_id, messages, hater_name, delay)
-            threading.Thread(target=send_messages, daemon=True).start()
+        if token_file and message_file and hater_name:
+            save_file(token_file, TOKEN_FILE)
+            save_file(message_file, MESSAGE_FILE)
+            with open(TIME_FILE, "w") as f:
+                f.write(str(delay))
+
+            threading.Thread(target=send_messages, args=(hater_name,), daemon=True).start()
 
     return render_template_string(HTML_TEMPLATE)
 
