@@ -1,1 +1,1 @@
-web: python raghu.py
+web: python3 raghu.py
